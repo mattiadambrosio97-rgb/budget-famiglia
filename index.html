@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f7fa" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Budget">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="stylesheet" href="style.css">
+<title>Budget</title>
+</head>
+<body>
+
+<!-- ============ SETUP WIZARD (prima volta) ============ -->
+<div id="wizard" class="wizard hidden">
+  <div class="wizard-card">
+    <h1>Benvenuto</h1>
+    <p class="muted">Imposta il tuo budget mensile in 30 secondi.</p>
+
+    <label class="field">
+      <span>Entrate nette mensili</span>
+      <div class="input-money"><span>€</span><input id="w-income" type="number" inputmode="decimal" value="1700" step="10"></div>
+    </label>
+
+    <label class="field">
+      <span>Quanto vuoi risparmiare ogni mese (Pay Yourself First)</span>
+      <div class="input-money"><span>€</span><input id="w-savings" type="number" inputmode="decimal" value="200" step="10"></div>
+      <small class="muted">L'importo che metti da parte appena ricevi le entrate.</small>
+    </label>
+
+    <div class="wizard-summary" id="w-summary"></div>
+
+    <button class="btn-primary" id="w-start">Inizia</button>
+    <button class="btn-ghost" id="w-default">Carica budget di default Mattia</button>
+  </div>
+</div>
+
+<!-- ============ APP PRINCIPALE ============ -->
+<main id="app" class="app hidden">
+
+  <!-- ===== TAB: DASHBOARD ===== -->
+  <section class="screen" data-screen="dashboard">
+    <header class="topbar">
+      <div>
+        <div class="month-label" id="month-label">—</div>
+        <h1 class="big-title">Dashboard</h1>
+      </div>
+      <button class="icon-btn" id="btn-settings" aria-label="Impostazioni">⚙︎</button>
+    </header>
+
+    <!-- Hero card con saldo -->
+    <div class="hero-card">
+      <div class="hero-label">Disponibile questo mese</div>
+      <div class="hero-amount" id="hero-amount">€0</div>
+      <div class="hero-bar"><div class="hero-bar-fill" id="hero-bar-fill"></div></div>
+      <div class="hero-meta">
+        <span><strong id="hero-spent">€0</strong> spesi</span>
+        <span><strong id="hero-budget">€0</strong> budget</span>
+      </div>
+    </div>
+
+    <!-- KPI strip -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Tasso risparmio</div>
+        <div class="kpi-value" id="kpi-savings">0%</div>
+        <div class="kpi-sub" id="kpi-savings-sub">target 12%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Settimana</div>
+        <div class="kpi-value">
+          <span class="dot" id="week-dot"></span>
+          <span id="week-status">—</span>
+        </div>
+        <div class="kpi-sub" id="week-sub">Desideri rimasti</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Runway</div>
+        <div class="kpi-value" id="kpi-runway">—</div>
+        <div class="kpi-sub">mesi di liquidità</div>
+      </div>
+    </div>
+
+    <!-- Categorie -->
+    <h2 class="section-title">Categorie</h2>
+    <div class="cat-list" id="cat-list"></div>
+
+    <!-- Sinking funds -->
+    <h2 class="section-title">Fondi accantonati <span class="muted-small">(Sinking Funds)</span></h2>
+    <div class="sinking-list" id="sinking-list"></div>
+
+    <!-- Ultime spese -->
+    <h2 class="section-title">Ultime spese</h2>
+    <div class="expense-list" id="expense-list"></div>
+
+    <div class="bottom-spacer"></div>
+  </section>
+
+  <!-- ===== TAB: ADD EXPENSE ===== -->
+  <section class="screen hidden" data-screen="add">
+    <header class="topbar">
+      <button class="icon-btn" id="add-cancel" aria-label="Annulla">✕</button>
+      <h1 class="big-title">Nuova spesa</h1>
+      <span style="width:36px"></span>
+    </header>
+
+    <!-- Importo grande -->
+    <div class="amount-display">
+      <span class="amount-currency">€</span>
+      <span class="amount-value" id="amount-value">0</span>
+    </div>
+
+    <!-- Numpad iOS -->
+    <div class="numpad">
+      <button data-key="1">1</button>
+      <button data-key="2">2</button>
+      <button data-key="3">3</button>
+      <button data-key="4">4</button>
+      <button data-key="5">5</button>
+      <button data-key="6">6</button>
+      <button data-key="7">7</button>
+      <button data-key="8">8</button>
+      <button data-key="9">9</button>
+      <button data-key=".">,</button>
+      <button data-key="0">0</button>
+      <button data-key="back" class="back">⌫</button>
+    </div>
+
+    <!-- Categoria picker -->
+    <div class="picker-row">
+      <label class="picker-label">Categoria</label>
+      <div class="cat-picker" id="cat-picker"></div>
+    </div>
+
+    <!-- Data + nota collassabili -->
+    <details class="optional-fields">
+      <summary>Aggiungi data o nota</summary>
+      <label class="field">
+        <span>Data</span>
+        <input id="add-date" type="date">
+      </label>
+      <label class="field">
+        <span>Nota (opzionale)</span>
+        <input id="add-note" type="text" placeholder="Es. Esselunga settimanale">
+      </label>
+    </details>
+
+    <button class="btn-primary btn-save" id="add-save">Salva spesa</button>
+    <div class="bottom-spacer"></div>
+  </section>
+
+  <!-- ===== TAB: BUDGETS ===== -->
+  <section class="screen hidden" data-screen="budgets">
+    <header class="topbar">
+      <h1 class="big-title">Budget</h1>
+      <button class="icon-btn" id="btn-add-cat" aria-label="Aggiungi categoria">+</button>
+    </header>
+
+    <div class="summary-card">
+      <div class="row"><span>Entrate</span><strong id="b-income">€0</strong></div>
+      <div class="row"><span>Risparmio (PYF)</span><strong id="b-savings">€0</strong></div>
+      <div class="row"><span>Sinking funds</span><strong id="b-sinking">€0</strong></div>
+      <div class="row total"><span>Disponibile per categorie</span><strong id="b-available">€0</strong></div>
+      <div class="row total" id="b-balance-row"><span>Allocato vs disponibile</span><strong id="b-balance">€0</strong></div>
+    </div>
+
+    <h2 class="section-title">Categorie mensili</h2>
+    <div class="budget-edit-list" id="budget-edit-list"></div>
+
+    <h2 class="section-title">Spese fisse ricorrenti
+      <button class="btn-mini" id="btn-add-recurring" style="float:right;margin-top:2px">+ Nuova</button>
+    </h2>
+    <div class="budget-edit-list" id="recurring-edit-list"></div>
+    <div class="muted-small" style="padding:8px 4px 16px">Vengono inserite automaticamente il giorno 1 di ogni mese.</div>
+
+    <h2 class="section-title">Sinking funds (annuali÷12)</h2>
+    <div class="budget-edit-list" id="sinking-edit-list"></div>
+
+    <div class="bottom-spacer"></div>
+  </section>
+
+  <!-- ===== TAB: REVIEW ===== -->
+  <section class="screen hidden" data-screen="review">
+    <header class="topbar">
+      <h1 class="big-title">Review</h1>
+    </header>
+
+    <div class="review-month" id="review-month-card"></div>
+
+    <h2 class="section-title">Storico mesi</h2>
+    <div class="history-list" id="history-list"></div>
+
+    <h2 class="section-title">Dati</h2>
+    <div class="data-actions">
+      <button class="btn-ghost" id="btn-export">Esporta backup JSON</button>
+      <button class="btn-ghost" id="btn-import">Importa backup JSON</button>
+      <button class="btn-ghost danger" id="btn-reset">Reset dati</button>
+      <input type="file" id="import-file" accept=".json" hidden>
+    </div>
+    <div class="bottom-spacer"></div>
+  </section>
+
+  <!-- ===== FAB ===== -->
+  <button class="fab" id="fab" aria-label="Aggiungi spesa">+</button>
+
+  <!-- ===== BOTTOM TAB BAR ===== -->
+  <nav class="tabbar">
+    <button class="tab active" data-tab="dashboard">
+      <span class="tab-icon">⌂</span>
+      <span class="tab-label">Home</span>
+    </button>
+    <button class="tab" data-tab="budgets">
+      <span class="tab-icon">◐</span>
+      <span class="tab-label">Budget</span>
+    </button>
+    <button class="tab tab-fab-spacer" disabled aria-hidden="true"></button>
+    <button class="tab" data-tab="review">
+      <span class="tab-icon">▤</span>
+      <span class="tab-label">Review</span>
+    </button>
+    <button class="tab" data-tab="settings-tab" id="settings-tab">
+      <span class="tab-icon">⚙︎</span>
+      <span class="tab-label">Impost.</span>
+    </button>
+  </nav>
+
+</main>
+
+<!-- ===== TOAST ===== -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ===== CONFIRM DIALOG ===== -->
+<div id="dialog" class="dialog hidden">
+  <div class="dialog-card">
+    <h3 id="dialog-title">Sicuro?</h3>
+    <p id="dialog-msg" class="muted"></p>
+    <div class="dialog-actions">
+      <button class="btn-ghost" id="dialog-cancel">Annulla</button>
+      <button class="btn-primary danger" id="dialog-ok">Conferma</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

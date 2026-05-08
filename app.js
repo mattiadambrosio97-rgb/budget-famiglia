@@ -240,6 +240,8 @@ function bindWizard() {
   };
   inc.addEventListener("input", update);
   sav.addEventListener("input", update);
+  // Auto-select on focus per facilitare la sostituzione su iPhone
+  [inc, sav].forEach(el => el.addEventListener("focus", () => setTimeout(()=>el.select(),50)));
   update();
 
   document.getElementById("w-default").addEventListener("click", () => {
@@ -262,11 +264,7 @@ function bindWizard() {
 function bindApp() {
   // Tab navigation
   document.querySelectorAll(".tab[data-tab]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const t = btn.dataset.tab;
-      if (t === "settings-tab") return switchTab("review"); // simplification
-      switchTab(t);
-    });
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
   });
 
   // FAB
@@ -282,8 +280,8 @@ function bindApp() {
   });
   document.getElementById("add-save").addEventListener("click", saveExpense);
 
-  // Settings/Reset
-  document.getElementById("btn-settings").addEventListener("click", () => switchTab("review"));
+  // Settings icon (top right Dashboard) → Dati
+  document.getElementById("btn-settings").addEventListener("click", () => switchTab("data"));
 
   // Export/Import/Reset
   document.getElementById("btn-export").addEventListener("click", exportData);
@@ -330,10 +328,13 @@ function switchTab(tab) {
   document.querySelectorAll(".tab[data-tab]").forEach(b => {
     b.classList.toggle("active", b.dataset.tab === tab);
   });
+  // Nasconde FAB su Add screen (è la stessa azione del FAB)
+  const fab = document.getElementById("fab");
+  if (fab) fab.style.display = (tab === "add") ? "none" : "grid";
   // Re-render specific screens
-  if (tab === "add")     renderAddScreen();
-  if (tab === "budgets") renderBudgets();
-  if (tab === "review")  renderReview();
+  if (tab === "add")       renderAddScreen();
+  if (tab === "budgets")   renderBudgets();
+  if (tab === "review")    renderReview();
   if (tab === "dashboard") renderDashboard();
   window.scrollTo(0, 0);
 }
@@ -381,7 +382,7 @@ function renderDashboard() {
     const spent = state.expenses.filter(e => e.categoryId === c.id).reduce((s,e)=>s+e.amount,0);
     const pct = c.budget > 0 ? (spent / c.budget) * 100 : 0;
     const left = c.budget - spent;
-    const cls = pct >= 100 ? "over" : pct >= 75 ? "warn" : "";
+    const cls = pct >= 100 ? "over" : pct >= 75 ? "warn" : "ok";
     const row = document.createElement("div");
     row.className = "cat-row";
     row.innerHTML = `
@@ -391,7 +392,7 @@ function renderDashboard() {
           <span>${c.name}</span>
           <span class="amount">${fmt(spent)} <span class="muted">/ ${fmt(c.budget)}</span></span>
         </div>
-        <div class="cat-bar"><div class="cat-bar-fill ${cls}" style="width:${Math.min(100,pct)}%; background:${pct<75?c.color:''}"></div></div>
+        <div class="cat-bar"><div class="cat-bar-fill ${cls}" style="width:${Math.min(100,pct)}%"></div></div>
         <div class="cat-meta">${left >= 0 ? `Rimangono ${fmt(left)}` : `Sforato di ${fmt(-left)}`} · ${pct.toFixed(0)}%</div>
       </div>
     `;
@@ -429,11 +430,14 @@ function renderDashboard() {
       const row = document.createElement("div");
       row.className = "expense-row";
       const autoBadge = e.auto ? `<span class="badge-auto">AUTO</span>` : "";
+      // Se c'è una nota usala come titolo principale, altrimenti nome categoria
+      const title = e.note ? escapeHtml(e.note) : (c?.name || "—");
+      const subtitle = e.note ? `${c?.name||'—'} · ${formatDate(e.date)}` : formatDate(e.date);
       row.innerHTML = `
         <div class="cat-icon" style="background:${c?.color||'#888'}22;color:${c?.color||'#888'}">${c?.icon||'•'}</div>
         <div class="expense-info">
-          <div class="expense-cat">${c?.name||'—'} ${autoBadge}</div>
-          <div class="expense-meta">${formatDate(e.date)}${e.note?' · '+escapeHtml(e.note):''}</div>
+          <div class="expense-cat">${title} ${autoBadge}</div>
+          <div class="expense-meta">${subtitle}</div>
         </div>
         <div class="expense-amount">${fmt2(e.amount)}</div>
         <button class="expense-delete" data-id="${e.id}" aria-label="Cancella">✕</button>
@@ -520,6 +524,7 @@ function renderAddScreen() {
     picker.appendChild(chip);
   });
   document.getElementById("amount-value").textContent = addAmount.replace(".", ",");
+  updateSaveButton();
 }
 
 function onNumpad(k) {
@@ -537,6 +542,16 @@ function onNumpad(k) {
   }
   document.getElementById("amount-value").textContent = addAmount.replace(".", ",");
   vibrate(8);
+  updateSaveButton();
+}
+
+function updateSaveButton() {
+  const btn = document.getElementById("add-save");
+  if (!btn) return;
+  const amount = parseFloat(addAmount) || 0;
+  const valid = amount > 0 && !!addCategory;
+  btn.disabled = !valid;
+  btn.style.opacity = valid ? "" : "0.4";
 }
 
 function saveExpense() {
@@ -565,6 +580,7 @@ function resetAddForm() {
   document.getElementById("add-note").value = "";
   document.getElementById("add-date").value = todayISO();
   document.querySelector(".optional-fields")?.removeAttribute("open");
+  updateSaveButton();
 }
 
 function deleteExpense(id) {
@@ -685,14 +701,17 @@ function makeEditableRow({icon, color, name, value, onChange, onDelete}) {
 
 function useSinking(idx) {
   const f = state.sinkingFunds[idx];
-  const amount = prompt(`Quanto stai usando dal fondo "${f.name}"?\nSaldo attuale: ${fmt(f.balance||0)}`, "0");
-  const v = parseFloat(String(amount).replace(",","."));
-  if (!v || v <= 0) return;
-  f.balance = (f.balance || 0) - v;
-  saveState();
-  renderBudgets();
-  renderDashboard();
-  toast(`Usati ${fmt(v)} dal fondo`);
+  openSheet(`Usa fondo "${f.name}"`, [
+    { type: "number", label: `Importo (saldo attuale: ${fmt(f.balance||0)})`, name: "amount", value: 0, money: true },
+  ], (val) => {
+    const v = parseFloat(String(val.amount).replace(",",".")) || 0;
+    if (v <= 0) { toast("Importo non valido"); return; }
+    f.balance = (f.balance || 0) - v;
+    saveState();
+    renderBudgets();
+    renderDashboard();
+    toast(`Usati ${fmt(v)} dal fondo`);
+  });
 }
 
 function renderRecurringList() {
@@ -735,15 +754,13 @@ function renderRecurringList() {
       renderRecurringList();
     });
     row.querySelector("[data-act=cat]").addEventListener("click", () => {
-      const ids = state.categories.map(c=>c.id);
-      const names = state.categories.map(c=>c.name);
-      const choice = prompt("Categoria? Inserisci numero:\n" + names.map((n,i)=>`${i+1}. ${n}`).join("\n"), "1");
-      const n = parseInt(choice);
-      if (n>=1 && n<=ids.length) {
-        r.categoryId = ids[n-1];
+      openSheet(`Categoria di "${r.name}"`, [
+        { type: "category", label: "Scegli categoria", name: "categoryId", value: r.categoryId },
+      ], (v) => {
+        r.categoryId = v.categoryId;
         saveState();
         renderRecurringList();
-      }
+      });
     });
     row.querySelector("[data-act=del]").addEventListener("click", () => {
       confirmDialog("Elimina ricorrente?", `"${r.name}" non sarà più aggiunta automaticamente.`, () => {
@@ -762,39 +779,50 @@ function renderRecurringList() {
 }
 
 function addRecurringPrompt() {
-  const name = prompt("Nome ricorrente (es. Netflix):");
-  if (!name) return;
-  const amt = parseFloat((prompt("Importo mensile (€):", "10") || "0").replace(",","."));
-  if (!amt) return;
-  const ids = state.categories.map(c=>c.id);
-  const names = state.categories.map(c=>c.name);
-  const choice = prompt("Categoria? Numero:\n" + names.map((n,i)=>`${i+1}. ${n}`).join("\n"), "1");
-  const n = parseInt(choice);
-  const catId = (n>=1 && n<=ids.length) ? ids[n-1] : ids[0];
-  if (!state.recurring) state.recurring = [];
-  state.recurring.push({
-    id: "r_" + uuid(),
-    name, amount: amt, categoryId: catId, dayOfMonth: 1, active: true,
+  openSheet("Nuova ricorrente", [
+    { type: "text", label: "Nome", name: "name", placeholder: "Es. Netflix" },
+    { type: "number", label: "Importo mensile", name: "amount", value: 10, money: true },
+    { type: "category", label: "Categoria", name: "categoryId" },
+  ], (v) => {
+    if (!v.name || !v.name.trim()) { toast("Manca il nome"); return; }
+    const amount = parseFloat(String(v.amount).replace(",",".")) || 0;
+    if (amount <= 0) { toast("Importo non valido"); return; }
+    if (!state.recurring) state.recurring = [];
+    state.recurring.push({
+      id: "r_" + uuid(),
+      name: v.name.trim(),
+      amount,
+      categoryId: v.categoryId,
+      dayOfMonth: 1,
+      active: true,
+    });
+    saveState();
+    renderRecurringList();
+    toast("Ricorrente aggiunta");
   });
-  saveState();
-  renderRecurringList();
-  toast("Ricorrente aggiunta");
 }
 
 function addCategoryPrompt() {
-  const name = prompt("Nome categoria:");
-  if (!name) return;
-  const budget = parseFloat((prompt("Budget mensile (€):", "50") || "0").replace(",","."));
-  if (!budget) return;
-  const colors = ["#34c759","#ff2d55","#5e5ce6","#0a84ff","#ff9f0a","#bf5af2","#64d2ff","#ff375f","#30d158"];
-  state.categories.push({
-    id: "c_" + uuid(),
-    name, icon: "📁", color: colors[state.categories.length % colors.length],
-    budget, type: "wants",
+  openSheet("Nuova categoria", [
+    { type: "text", label: "Nome", name: "name", placeholder: "Es. Hobby" },
+    { type: "number", label: "Budget mensile", name: "budget", value: 50, money: true },
+  ], (v) => {
+    if (!v.name || !v.name.trim()) { toast("Manca il nome"); return; }
+    const budget = parseFloat(String(v.budget).replace(",",".")) || 0;
+    const colors = ["#34c759","#ff2d55","#5e5ce6","#0a84ff","#ff9f0a","#bf5af2","#64d2ff","#ff375f","#30d158"];
+    state.categories.push({
+      id: "c_" + uuid(),
+      name: v.name.trim(),
+      icon: "📁",
+      color: colors[state.categories.length % colors.length],
+      budget,
+      type: "wants",
+    });
+    saveState();
+    renderBudgets();
+    renderDashboard();
+    toast("Categoria aggiunta");
   });
-  saveState();
-  renderBudgets();
-  renderDashboard();
 }
 
 // ============================================================
@@ -926,6 +954,87 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.add("hidden"), 2200);
 }
 
+/**
+ * Bottom sheet generico.
+ * @param {string} title
+ * @param {Array<{type:'text'|'number'|'category', label:string, name:string, value?:any, placeholder?:string}>} fields
+ * @param {(values:Object)=>void} onSubmit
+ */
+function openSheet(title, fields, onSubmit, opts = {}) {
+  const sheet = document.getElementById("sheet");
+  const titleEl = document.getElementById("sheet-title");
+  const body = document.getElementById("sheet-body");
+  const ok = document.getElementById("sheet-ok");
+  const cancel = document.getElementById("sheet-cancel");
+
+  titleEl.textContent = title;
+  body.innerHTML = "";
+
+  const inputs = {};
+  fields.forEach(f => {
+    if (f.type === "text" || f.type === "number") {
+      const wrap = document.createElement("label");
+      wrap.className = "field";
+      const isMoney = f.type === "number" && f.money;
+      wrap.innerHTML = `<span>${escapeHtml(f.label)}</span>` + (isMoney
+        ? `<div class="input-money"><span>€</span><input type="number" inputmode="decimal" step="0.01" value="${f.value??""}" placeholder="${f.placeholder||""}"></div>`
+        : `<input type="${f.type}" ${f.type==='number'?'inputmode="decimal" step="0.01"':''} value="${f.value??""}" placeholder="${f.placeholder||""}">`);
+      body.appendChild(wrap);
+      const inp = wrap.querySelector("input");
+      inp.addEventListener("focus", () => setTimeout(()=>inp.select(),50));
+      inputs[f.name] = inp;
+    } else if (f.type === "category") {
+      const wrap = document.createElement("label");
+      wrap.className = "field";
+      wrap.innerHTML = `<span>${escapeHtml(f.label)}</span><div class="cat-options"></div>`;
+      body.appendChild(wrap);
+      const opts = wrap.querySelector(".cat-options");
+      let selected = f.value || (state.categories[0] && state.categories[0].id);
+      const renderOpts = () => {
+        opts.innerHTML = "";
+        state.categories.forEach(c => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "cat-option" + (c.id === selected ? " selected" : "");
+          btn.innerHTML = `<span class="ic" style="background:${c.color}22;color:${c.color}">${c.icon}</span><span>${escapeHtml(c.name)}</span>`;
+          btn.addEventListener("click", () => { selected = c.id; renderOpts(); });
+          opts.appendChild(btn);
+        });
+      };
+      renderOpts();
+      inputs[f.name] = { get value(){ return selected; } };
+    }
+  });
+
+  sheet.classList.remove("hidden");
+
+  const close = () => sheet.classList.add("hidden");
+  const okHandler = () => {
+    const values = {};
+    for (const k in inputs) values[k] = inputs[k].value;
+    if (opts.validate) {
+      const err = opts.validate(values);
+      if (err) { toast(err); return; }
+    }
+    close();
+    cleanup();
+    onSubmit(values);
+  };
+  const cancelHandler = () => { close(); cleanup(); };
+  const backdropHandler = (e) => { if (e.target === sheet) { close(); cleanup(); } };
+  const escHandler = (e) => { if (e.key === "Escape") { close(); cleanup(); } };
+  function cleanup() {
+    ok.removeEventListener("click", okHandler);
+    cancel.removeEventListener("click", cancelHandler);
+    sheet.removeEventListener("click", backdropHandler);
+    document.removeEventListener("keydown", escHandler);
+  }
+  ok.addEventListener("click", okHandler);
+  cancel.addEventListener("click", cancelHandler);
+  sheet.addEventListener("click", backdropHandler);
+  document.addEventListener("keydown", escHandler);
+}
+
 function confirmDialog(title, msg, onOk) {
   const d = document.getElementById("dialog");
   document.getElementById("dialog-title").textContent = title;
@@ -936,12 +1045,18 @@ function confirmDialog(title, msg, onOk) {
   const close = () => d.classList.add("hidden");
   const okHandler = () => { close(); onOk(); cleanup(); };
   const cancelHandler = () => { close(); cleanup(); };
+  const backdropHandler = (e) => { if (e.target === d) { close(); cleanup(); } };
+  const escHandler = (e) => { if (e.key === "Escape") { close(); cleanup(); } };
   function cleanup() {
     ok.removeEventListener("click", okHandler);
     cancel.removeEventListener("click", cancelHandler);
+    d.removeEventListener("click", backdropHandler);
+    document.removeEventListener("keydown", escHandler);
   }
   ok.addEventListener("click", okHandler);
   cancel.addEventListener("click", cancelHandler);
+  d.addEventListener("click", backdropHandler);
+  document.addEventListener("keydown", escHandler);
 }
 
 // ============================================================

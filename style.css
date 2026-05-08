@@ -87,7 +87,7 @@ input, button, textarea, select {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.bottom-spacer { height: 40px; }
+.bottom-spacer { height: 90px; }
 
 /* ===== TOPBAR ===== */
 .topbar {
@@ -273,6 +273,7 @@ input, button, textarea, select {
   background: var(--tint);
   transition: width 0.4s cubic-bezier(.4,0,.2,1);
 }
+.cat-bar-fill.ok    { background: var(--tint); }
 .cat-bar-fill.warn  { background: var(--warn); }
 .cat-bar-fill.over  { background: var(--danger); }
 .cat-meta {
@@ -764,6 +765,89 @@ input, button, textarea, select {
   from { opacity: 0; transform: translate(-50%, 10px); }
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* ===== BOTTOM SHEET ===== */
+.sheet {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 250;
+  animation: fadeIn 0.18s ease-out;
+}
+.sheet-card {
+  background: var(--bg-elev);
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  padding: 8px 22px calc(22px + var(--safe-bottom));
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: sheetUp 0.22s cubic-bezier(.4,0,.2,1);
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.sheet-handle {
+  width: 38px;
+  height: 4px;
+  background: var(--separator);
+  border-radius: 2px;
+  margin: 6px auto 14px;
+}
+.sheet-card h3 {
+  margin: 0 0 16px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.sheet-card .field {
+  margin-bottom: 14px;
+}
+.sheet-card .cat-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.sheet-card .cat-option {
+  background: var(--bg-elev-2);
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sheet-card .cat-option .ic {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+.sheet-card .cat-option.selected {
+  border-color: var(--tint);
+  background: color-mix(in srgb, var(--tint) 10%, var(--bg-elev-2));
+}
+.sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.sheet-actions .btn-primary,
+.sheet-actions .btn-ghost { margin: 0; }
 
 /* ===== DIALOG ===== */
 .dialog {

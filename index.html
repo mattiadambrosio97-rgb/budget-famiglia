@@ -167,7 +167,7 @@
       <div class="row"><span>Risparmio (PYF)</span><strong id="b-savings">€0</strong></div>
       <div class="row"><span>Sinking funds</span><strong id="b-sinking">€0</strong></div>
       <div class="row total"><span>Disponibile per categorie</span><strong id="b-available">€0</strong></div>
-      <div class="row total" id="b-balance-row"><span>Allocato vs disponibile</span><strong id="b-balance">€0</strong></div>
+      <div class="row total" id="b-balance-row"><span>Margine non allocato</span><strong id="b-balance">€0</strong></div>
     </div>
 
     <h2 class="section-title">Categorie mensili</h2>
@@ -196,20 +196,41 @@
     <h2 class="section-title">Storico mesi</h2>
     <div class="history-list" id="history-list"></div>
 
-    <h2 class="section-title">Dati</h2>
+    <div class="bottom-spacer"></div>
+  </section>
+
+  <!-- ===== TAB: DATA / SETTINGS ===== -->
+  <section class="screen hidden" data-screen="data">
+    <header class="topbar">
+      <h1 class="big-title">Dati</h1>
+    </header>
+
+    <h2 class="section-title">Backup</h2>
     <div class="data-actions">
       <button class="btn-ghost" id="btn-export">Esporta backup JSON</button>
       <button class="btn-ghost" id="btn-import">Importa backup JSON</button>
-      <button class="btn-ghost danger" id="btn-reset">Reset dati</button>
       <input type="file" id="import-file" accept=".json" hidden>
     </div>
+    <p class="muted-small" style="padding:6px 4px 0">I tuoi dati restano sul tuo dispositivo (localStorage). Esporta regolarmente per non perderli se cambi telefono o cancelli i dati del browser.</p>
+
+    <h2 class="section-title">Zona pericolo</h2>
+    <div class="data-actions">
+      <button class="btn-ghost danger" id="btn-reset">Reset completo dei dati</button>
+    </div>
+
+    <h2 class="section-title">Info</h2>
+    <div class="cat-list">
+      <div class="cat-row"><div class="cat-info"><div class="cat-name"><span>Versione</span><span class="muted">1.1</span></div></div></div>
+      <div class="cat-row"><div class="cat-info"><div class="cat-name"><span>Repository</span><span class="muted">budget-famiglia</span></div></div></div>
+    </div>
+
     <div class="bottom-spacer"></div>
   </section>
 
   <!-- ===== FAB ===== -->
   <button class="fab" id="fab" aria-label="Aggiungi spesa">+</button>
 
-  <!-- ===== BOTTOM TAB BAR ===== -->
+  <!-- ===== BOTTOM TAB BAR (4 tab + FAB centrale) ===== -->
   <nav class="tabbar">
     <button class="tab active" data-tab="dashboard">
       <span class="tab-icon">⌂</span>
@@ -224,9 +245,9 @@
       <span class="tab-icon">▤</span>
       <span class="tab-label">Review</span>
     </button>
-    <button class="tab" data-tab="settings-tab" id="settings-tab">
+    <button class="tab" data-tab="data">
       <span class="tab-icon">⚙︎</span>
-      <span class="tab-label">Impost.</span>
+      <span class="tab-label">Dati</span>
     </button>
   </nav>
 
@@ -234,6 +255,19 @@
 
 <!-- ===== TOAST ===== -->
 <div id="toast" class="toast hidden"></div>
+
+<!-- ===== BOTTOM SHEET (form modale) ===== -->
+<div id="sheet" class="sheet hidden">
+  <div class="sheet-card">
+    <div class="sheet-handle"></div>
+    <h3 id="sheet-title">Form</h3>
+    <div id="sheet-body"></div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="sheet-cancel">Annulla</button>
+      <button class="btn-primary" id="sheet-ok">Conferma</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== CONFIRM DIALOG ===== -->
 <div id="dialog" class="dialog hidden">
